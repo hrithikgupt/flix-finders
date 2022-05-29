@@ -20,19 +20,22 @@ import os.path
 import csv
 import shutil
 
-conn = sqlite3.connect('data.db')
+conn = sqlite3.connect('data.db')  # Creating the connection to database
 c = conn.cursor()
+
+# Functions for using the database
 
 
 def create_usertable():
     c.execute(
         'CREATE TABLE IF NOT EXISTS userstable(name TEXT,username TEXT,password TEXT)')
 
+
 def create_movietable():
     c.execute('CREATE TABLE IF NOT EXISTS movietable(username TEXT,data BLOB)')
 
 
-def add_userdata(name,username, password):
+def add_userdata(name, username, password):
     l = list()
     l.append(password)
     hashed_l = stauth.Hasher(l).generate()
@@ -41,61 +44,70 @@ def add_userdata(name,username, password):
     conn.commit()
 
 
-def add_moviedata(username,data):
+def add_moviedata(username, data):
     c.execute('INSERT INTO movietable(username,data) VALUES (?,?)',
-              (username,data))
+              (username, data))
     conn.commit()
 
+
 def check_entry(username):
-    c.execute('SELECT * FROM movietable WHERE username=?',(username,))
+    c.execute('SELECT * FROM movietable WHERE username=?', (username,))
     rows = c.fetchall()
     if len(rows) == 1:
         return True
     else:
         return False
 
+
 def get_moviedata(username):
-    c.execute('SELECT data FROM movietable WHERE username=?',(username,))
-    rows = c.fetchall();
+    c.execute('SELECT data FROM movietable WHERE username=?', (username,))
+    rows = c.fetchall()
     data = pickle.loads(rows[0][0])
     return data
 
-def update_moviedata(username,data):
-    c.execute('UPDATE movietable SET data=? WHERE username=?',(data,username))
+# Functions for getting movie data from TMDB API
+def update_moviedata(username, data):
+    c.execute('UPDATE movietable SET data=? WHERE username=?', (data, username))
     conn.commit()
 
 
 def fetch_poster(movie_id):
-    url = "https://api.themoviedb.org/3/movie/{}?api_key=f3439b10af2bac0609b650406b6e3a7d&language=en-US".format(movie_id)
+    url = "https://api.themoviedb.org/3/movie/{}?api_key=f3439b10af2bac0609b650406b6e3a7d&language=en-US".format(
+        movie_id)
     data = requests.get(url)
     data = data.json()
     poster_path = data['poster_path']
     full_path = "https://image.tmdb.org/t/p/w500/" + poster_path
     return full_path
 
+
 def fetch_name(movie_id):
-    url = "https://api.themoviedb.org/3/movie/{}?api_key=f3439b10af2bac0609b650406b6e3a7d&language=en-US".format(movie_id)
+    url = "https://api.themoviedb.org/3/movie/{}?api_key=f3439b10af2bac0609b650406b6e3a7d&language=en-US".format(
+        movie_id)
     data = requests.get(url)
     data = data.json()
-    name = data['original_title']
+    name = data['title']
     return name
 
+
 def LoadMovieLensData():
-                    ml = MovieLens()
-                    # print("Loading movie ratings...")
-                    data = ml.loadMovieLensLatestSmall()
-                    # print("\nComputing movie popularity ranks so we can measure novelty later...")
-                    rankings = defaultdict(int)
-                    return (ml, data, rankings)
+    ml = MovieLens()
+    # print("Loading movie ratings...")
+    data = ml.loadMovieLensLatestSmall()
+    # print("\nComputing movie popularity ranks so we can measure novelty later...")
+    rankings = defaultdict(int)
+    return (ml, data, rankings)
+
 
 def copy_csv():
-    shutil.copy2('ml-latest-small/ratings.csv','ml-latest-small/ratingsAfterUser.csv')
-
+    shutil.copy2('ml-latest-small/ratings.csv',
+                 'ml-latest-small/ratingsAfterUser.csv')
 
 
 with st.sidebar:
-    choose = option_menu("Menu", ["Home","Recommendations","Profile", "Signup"],
-                         icons=['house','fullscreen','person', 'box-arrow-right'],
+    choose = option_menu("Menu", ["Home", "Recommendations", "Profile", "Signup"],
+                         icons=['house', 'fullscreen',
+                                'person', 'box-arrow-right'],
                          menu_icon="list", default_index=0)
 
 
@@ -118,35 +130,39 @@ if choose == "Home" or choose == "Profile" or choose == 'Recommendations':
 
     name, authentication_status, username = authenticator.login(
         'Login', 'main')
-    movies = pickle.load(open('movie_list.pkl','rb'))
+    movies = pickle.load(open('movie_list.pkl', 'rb'))
 
     if authentication_status and choose == 'Home':
         authenticator.logout('Logout', 'main')
         st.title('Home')
-        st.write(f'Welcome, {name}. Rate atleast 5 movies to get movie recommendations')
+        st.write(
+            f'Welcome, {name}. Rate atleast 5 movies to get movie recommendations')
         with st.form("RatingForm"):
             movie_list = movies['title'].values
-            selected_movie = st.selectbox("Type or select the movie you want to rate from the dropdown",movie_list)
-            rating = st.slider("Movie Rating",min_value=0.5,max_value=5.0,step=0.5)
+            selected_movie = st.selectbox(
+                "Type or select the movie you want to rate from the dropdown", movie_list)
+            rating = st.slider("Movie Rating", min_value=0.5,
+                               max_value=5.0, step=0.5)
             rate = st.form_submit_button("Rate")
             if rate:
                 create_movietable()
                 if check_entry(username):
                     rating_list = get_moviedata(username)
-                    temp_tuple = (611,int(re.findall(r'[0-9]+',str(movies[movies['title'] == selected_movie]))[1]),rating,0)
+                    temp_tuple = (611, int(re.findall(
+                        r'[0-9]+', str(movies[movies['title'] == selected_movie]))[1]), rating, 0)
                     rating_list.append(temp_tuple)
-                    pdata = pickle.dumps(rating_list,protocol=pickle.HIGHEST_PROTOCOL)
-                    update_moviedata(username,sqlite3.Binary(pdata))
+                    pdata = pickle.dumps(
+                        rating_list, protocol=pickle.HIGHEST_PROTOCOL)
+                    update_moviedata(username, sqlite3.Binary(pdata))
                 else:
-                    temp_tuple = (611,int(re.findall(r'[0-9]+',str(movies[movies['title'] == selected_movie]))[1]),rating,0)
+                    temp_tuple = (611, int(re.findall(
+                        r'[0-9]+', str(movies[movies['title'] == selected_movie]))[1]), rating, 0)
                     rating_list = [temp_tuple]
-                    pdata = pickle.dumps(rating_list,protocol=pickle.HIGHEST_PROTOCOL)
-                    add_moviedata(username,sqlite3.Binary(pdata))
-                st.success("You have rated {}, with {} stars rating".format(selected_movie,rating))
-
-                    
-
-                
+                    pdata = pickle.dumps(
+                        rating_list, protocol=pickle.HIGHEST_PROTOCOL)
+                    add_moviedata(username, sqlite3.Binary(pdata))
+                st.success("You have rated {}, with {} stars rating".format(
+                    selected_movie, rating))
 
     elif authentication_status and choose == 'Profile':
         authenticator.logout('Logout', 'main')
@@ -154,9 +170,11 @@ if choose == "Home" or choose == "Profile" or choose == 'Recommendations':
         st.subheader('Username: {}'.format(username))
         st.subheader('Rated Movies')
         profile_data = get_moviedata(username)
-        profile_df = pd.DataFrame(profile_data,columns=['Index','Movie Name','Rating','Drop'])
-        profile_df = profile_df.drop(columns=['Index','Drop'])
-        profile_df['Movie Name'] = profile_df['Movie Name'].apply(lambda x:fetch_name(movies[movies['movieId']==x].values.tolist()[0][3]))
+        profile_df = pd.DataFrame(profile_data, columns=[
+                                  'Index', 'Movie Name', 'Rating', 'Drop'])
+        profile_df = profile_df.drop(columns=['Index', 'Drop'])
+        profile_df['Movie Name'] = profile_df['Movie Name'].apply(
+            lambda x: fetch_name(movies[movies['movieId'] == x].values.tolist()[0][3]))
         st.dataframe(profile_df)
 
     elif authentication_status and choose == 'Recommendations':
@@ -164,10 +182,11 @@ if choose == "Home" or choose == "Profile" or choose == 'Recommendations':
         st.title('Recommendations')
         namesNposter = []
         with st.form("RecommendationForm"):
-            selected_algo = st.selectbox("Select the algorithm using which you want to receiver the recommendations",["SVD","SVD++"])
+            selected_algo = st.selectbox(
+                "Select the algorithm using which you want to receiver the recommendations", ["SVD", "SVD++"])
             submitted = st.form_submit_button("Submit")
             if submitted:
-                (pred,algo) = dump.load(selected_algo)
+                (pred, algo) = dump.load(selected_algo)
 
                 np.random.seed(0)
                 random.seed(0)
@@ -176,7 +195,7 @@ if choose == "Home" or choose == "Profile" or choose == 'Recommendations':
                     os.remove('ml-latest-small/ratingsAfterUser.csv')
                 copy_csv()
                 movie_data = get_moviedata(username)
-                with open('ml-latest-small/ratingsAfterUser.csv','a') as csvfile:
+                with open('ml-latest-small/ratingsAfterUser.csv', 'a') as csvfile:
                     csvwriter = csv.writer(csvfile)
                     csvwriter.writerows(movie_data)
 
@@ -185,24 +204,26 @@ if choose == "Home" or choose == "Profile" or choose == 'Recommendations':
                 # Construct an Evaluator to evaluate them
                 evaluator = Evaluator(evaluationData, rankings)
 
-                ml = pickle.load(open('ml.pkl','rb'))
+                ml = pickle.load(open('ml.pkl', 'rb'))
                 testSet = evaluator.dataset.GetAntiTestSetForUser(611)
-                print(len(testSet))      
+                print(len(testSet))
                 predictions = algo.test(testSet)
                 recommendations = []
                 for userID, movieID, actualRating, estimatedRating, _ in predictions:
                     intMovieID = int(movieID)
                     recommendations.append((intMovieID, estimatedRating))
-                            
+
                 recommendations.sort(key=lambda x: x[1], reverse=True)
                 # print(recommendations)
-                
-                
+
                 for movie in recommendations[:10]:
-                    temp_list = movies[movies['movieId']==movie[0]].values.tolist()
+                    temp_list = movies[movies['movieId']
+                                       == movie[0]].values.tolist()
                     tmdbID = int(temp_list[0][3])
-                    namesNposter.append((fetch_name(tmdbID),fetch_poster(tmdbID)))
-                col1, col2, col3, col4, col5, col6, col7, col8, col9, col10= st.columns(10)
+                    namesNposter.append(
+                        (fetch_name(tmdbID), fetch_poster(tmdbID)))
+                col1, col2, col3, col4, col5, col6, col7, col8, col9, col10 = st.columns(
+                    10)
                 with col1:
                     st.image(namesNposter[0][1])
                     st.text(namesNposter[0][0])
@@ -233,7 +254,8 @@ if choose == "Home" or choose == "Profile" or choose == 'Recommendations':
                 with col10:
                     st.image(namesNposter[9][1])
                     st.text(namesNposter[9][0])
-        col1, col2, col3, col4, col5, col6, col7, col8, col9, col10= st.columns(10)
+        col1, col2, col3, col4, col5, col6, col7, col8, col9, col10 = st.columns(
+            10)
 
     elif authentication_status == False:
         st.error('Username/password is incorrect')
@@ -243,11 +265,13 @@ elif choose == "Signup":
     st.subheader("Create an Account")
     new_name = st.text_input('First Name')
     new_user = st.text_input("Username")
-    new_pass = st.text_input("Password",type='password')
+    new_pass = st.text_input("Password", type='password')
     if st.button('Signup'):
         if new_name == '' or new_pass == '' or new_user == '':
-            st.error('You are not entering one of the fields. All fields are required.')
+            st.error(
+                'You are not entering one of the fields. All fields are required.')
         else:
             create_usertable()
-            add_userdata(new_name,new_user,new_pass)
-            st.success("You have successfully created an account. Click on Home to login")
+            add_userdata(new_name, new_user, new_pass)
+            st.success(
+                "You have successfully created an account. Click on Home to login")
